@@ -52,7 +52,7 @@ def _build_llms():
         from agent.openai_llm import OpenAIFastLLM, OpenAIQualityLLM
         fast = OpenAIFastLLM(os.environ.get("OPENAI_FAST_MODEL", "gpt-4o-mini"),
                              usd_per_1k_tokens=0.00015)
-        quality = OpenAIQualityLLM(os.environ.get("OPENAI_QUALITY_MODEL", "gpt-4o"),
+        quality = OpenAIQualityLLM(os.environ.get("OPENAI_QUALITY_MODEL", "gpt-4o-mini"),
                                    usd_per_1k_tokens=0.005)
         return backend, fast, quality
     fast = FastLLM("fast-model-stub", usd_per_1k_tokens=0.00015)

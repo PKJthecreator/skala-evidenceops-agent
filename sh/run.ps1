@@ -1,4 +1,4 @@
-﻿param([ValidateSet('fake', 'ollama')][string]$Backend = 'fake', [switch]$Frontend)
+﻿param([ValidateSet('fake', 'ollama', 'openai')][string]$Backend = 'fake', [switch]$Frontend)
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 if (-not (Test-Path -LiteralPath '.venv\Scripts\python.exe')) { throw 'Run sh/setup_venv.ps1 first.' }

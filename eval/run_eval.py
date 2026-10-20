@@ -40,8 +40,15 @@ async def evaluate(args):
         for path in project.rglob("*.py"):
             path.write_text(path.read_text(encoding="utf-8").replace(".read_text()", '.read_text(encoding="utf-8")'), encoding="utf-8")
     sys.path.insert(0, str(project))
+    args.model = args.model or ("gpt-4o-mini" if args.backend == "openai" else "qwen3.5:2b")
     os.environ.update(LLM_BACKEND=args.backend, SUPERVISOR_VERSION="v2", LANGCHAIN_TRACING_V2="false",
-                      OLLAMA_FAST_MODEL=args.model, OLLAMA_QUALITY_MODEL=args.model)
+                      OLLAMA_FAST_MODEL=args.model, OLLAMA_QUALITY_MODEL=args.model,
+                      OPENAI_FAST_MODEL=args.model, OPENAI_QUALITY_MODEL=args.model)
+    if args.backend == "openai":
+        from dotenv import load_dotenv
+        load_dotenv(ROOT / ".env")  # server.py의 load_dotenv()는 cwd 기준이라 키를 명시적으로 읽는다.
+        if not os.getenv("OPENAI_API_KEY"):
+            raise SystemExit("OPENAI_API_KEY가 .env에 없습니다.")
     import httpx
     # 모델 추론 설정은 원본과 개선판에 공통 적용한다. 프롬프트·판단 로직은 그대로 둔다.
     options = {"temperature": 0.0, "num_ctx": 8192, "num_predict": 700}
@@ -126,8 +133,8 @@ async def evaluate(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", choices=("fake", "ollama"), default="fake")
-    parser.add_argument("--model", default="qwen3.5:2b")
+    parser.add_argument("--backend", choices=("fake", "ollama", "openai"), default="fake")
+    parser.add_argument("--model", help="기본: ollama=qwen3.5:2b, openai=gpt-4o-mini(생성·분류 공통)")
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--out", default="results/after.json")
     raise SystemExit(asyncio.run(evaluate(parser.parse_args())))
