@@ -33,7 +33,7 @@ class SystemStatus(BaseModel):
 @mcp.tool()
 def get_monitoring_status(system_name: str) -> SystemStatus:
     """지정된 시스템의 현재 모니터링 상태를 조회합니다 (호출마다 값이 달라지는 동적 Tool)."""
-    monitoring_data = json.loads((DATA_DIR / "monitoring.json").read_text())
+    monitoring_data = json.loads((DATA_DIR / "monitoring.json").read_text(encoding="utf-8"))
     if system_name not in monitoring_data:
         return SystemStatus(
             system_name=system_name, status="unknown",
@@ -59,7 +59,7 @@ def get_incident_runbook(incident_type: str) -> str:
     runbook_path = DATA_DIR / "runbooks" / f"{incident_type}.md"
     if not runbook_path.exists():
         return f"# Runbook Not Found\n\nNo runbook for incident type: {incident_type}"
-    return runbook_path.read_text()
+    return runbook_path.read_text(encoding="utf-8")
 
 
 @mcp.prompt()

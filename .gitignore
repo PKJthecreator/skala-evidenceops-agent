@@ -3,3 +3,8 @@
 session.db
 __pycache__/
 *.log
+.tools/
+*.db
+.env.*
+!.env.example
+results/chat_history*.md

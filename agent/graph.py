@@ -1,50 +1,30 @@
 """v2 Supervisor — 실제 langgraph.StateGraph (Wave 4·5·6·7·8·10b·15 통합).
 
 route → (chat 직행 | incident 파이프라인)
-incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트) → research(가드+병렬+재시도)
-          → replan_check(부족 시 gap task 후 재조사) → analysis(needs_analysis=True일 때만
+incident: plan(확정 대상 + MCP Prompt) → gate → research(대상별 격리·재시도)
+          → replan_check(런북 검색) → analysis(needs_analysis=True일 때만
           실제 실행) → write → validate(반려 시 재작성) → finalize
 
 모든 노드는 SupervisorDeps를 functools.partial로 주입받는 순수 함수다(Wave 13).
 각 노드는 @traceable로 LangSmith에 계층 트리로 기록된다.
 """
 import asyncio
-import json
+import re
 import time
 from functools import partial
-from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from langgraph.config import get_stream_writer
 from langgraph.graph import END, StateGraph
 from langsmith import traceable
 
 from .deps import SupervisorDeps
 from .retry import with_retry
+from .intent import SERVICE_ID, SYMPTOM, classify, name_reply, targets_for
+from .evidence import checked_status, render_answer, safe_notes
 
 
-def _load_known_systems() -> set[str]:
-    """ollama_llm.py/openai_llm.py와 동일한 소스(data/monitoring.json)에서
-    시스템 목록을 읽는다 — plan_node가 MCP Prompt에 넘길 system_name을
-    쿼리에서 멤버십 매칭으로 뽑아낼 때 쓴다."""
-    path = Path(__file__).resolve().parent.parent / "data" / "monitoring.json"
-    try:
-        return set(json.loads(path.read_text()).keys())
-    except (OSError, json.JSONDecodeError):
-        return {"auth-service", "web-01"}
-
-
-KNOWN_SYSTEMS = _load_known_systems()
-
-
-def _extract_system_name(query: str) -> str:
-    """정규식 대신 실제 KNOWN_SYSTEMS 멤버십 매칭 — MCP Prompt(incident_analysis_
-    prompt)의 system_name은 "시스템: X" 한 줄짜리 컨텍스트라 항상 정해진 이름
-    중 하나로만 고정한다(여러 개 언급돼도 join하지 않음 — 실제 조사 대상 목록은
-    이후 plan()의 tasks가 별도로 결정). 쿼리에서 가장 먼저 등장하는 시스템을
-    고르고, 하나도 안 걸리면 가장 흔한 사례인 auth-service로 폴백."""
-    matches = [(query.index(s), s) for s in KNOWN_SYSTEMS if s in query]
-    return min(matches)[1] if matches else "auth-service"
+async def _sync_call(fn, *args):
+    return await asyncio.wait_for(asyncio.to_thread(fn, *args), timeout=120)
 
 
 class AgentState(TypedDict, total=False):
@@ -66,6 +46,9 @@ class AgentState(TypedDict, total=False):
     last_prompt: str
     cost_usd: float
     events: list[dict]
+    intent: str
+    targets: list[str]
+    validated_notes: str
 
 
 def _cost(state: AgentState, usage: dict) -> float:
@@ -74,25 +57,41 @@ def _cost(state: AgentState, usage: dict) -> float:
 
 @traceable(name="route_node")
 async def route_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 5 — 모든 쿼리가 무거운 파이프라인을 탈 필요는 없다."""
-    result, usage = deps.fast_llm.route(state["query"])
-    event = {"type": "RouteDecided", "route": result["route"]}
-    return {"route": result["route"], "needs_analysis": result["needs_analysis"],
+    query = state["query"]
+    thread = state["thread_id"]
+    if re.fullmatch(r"취소(?:해\s*줘|해\s*주세요)?[.!?]?", query.strip()):
+        deps.session_store.set_pending(thread, None)
+        return {"route": "clarify", "intent": "clarify", "targets": [], "final": "보류한 요청을 취소했습니다.", "events": []}
+    remembered = name_reply(query, state.get("history", []))
+    if remembered:
+        deps.session_store.set_pending(thread, None)
+        return {"route": "chat", "intent": "chat", "targets": [], "final": remembered,
+                "events": state.get("events", []) + [{"type": "RouteDecided", "route": "chat", "targets": []},
+                                                      {"type": "Finalize", "pipeline": "name-recall"}]}
+    pending = deps.session_store.get_pending(thread)
+    if pending and targets_for(query)[0] and not SYMPTOM.search(query):
+        query = pending + "\n확인 대상: " + query
+    try:
+        result, usage = await _sync_call(deps.fast_llm.route, query)
+    except Exception:
+        result, usage = {"route": "chat", "needs_analysis": False}, {"usd": 0.0}
+    intent, targets, reply = classify(query, result["route"])
+    deps.session_store.set_pending(thread, SERVICE_ID.sub("", query) if intent == "clarify" else None)
+    event = {"type": "RouteDecided", "route": intent, "targets": targets}
+    return {"query": query, "route": "chat" if intent == "chat" else "incident", "intent": intent,
+            "targets": targets, "final": reply, "needs_analysis": result["needs_analysis"],
             "cost_usd": _cost(state, usage),
             "events": state.get("events", []) + [event]}
 
 
 @traceable(name="chat_answer_node")
 async def chat_answer_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 5 direct 경로 — 히스토리 기반 응답 (Wave 12 세션 증명 지점).
-
-    토큰 단위 스트리밍 — get_stream_writer()는 /chat/stream처럼 custom 모드로 소비될
-    때만 실제로 전송되고, /chat(ainvoke)처럼 스트리밍하지 않는 호출에서는 자동으로
-    no-op이 된다."""
-    writer = get_stream_writer()
-    reply, usage = await deps.fast_llm.chat(
-        state["query"], state.get("history", []),
-        on_token=lambda piece: writer({"type": "AnswerToken", "delta": piece}))
+    """히스토리 기반 대화. 초안 토큰 없이 최종 답변만 반환한다."""
+    try:
+        reply, usage = await asyncio.wait_for(deps.fast_llm.chat(
+            state["query"], state.get("history", [])), timeout=120)
+    except Exception:
+        reply, usage = "대화 응답을 생성하지 못했습니다. 잠시 후 다시 요청해 주세요.", {"usd": 0.0}
     return {"final": reply, "last_prompt": usage.get("prompt"),
             "cost_usd": _cost(state, usage),
             "events": state["events"] + [{"type": "Finalize", "pipeline": "chat-direct"}]}
@@ -104,18 +103,23 @@ async def plan_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
     resource와 마찬가지로 이름을 어느 서버가 들고 있는지 미리 가정하지 않고,
     find_prompt()로 연결된 서버들을 먼저 조회해 찾은 뒤에만 get_prompt를 보낸다."""
-    prompt_server = await deps.mcp.find_prompt("incident_analysis_prompt")
-    procedure = await deps.mcp.get_prompt(
-        "incident_analysis_prompt",
-        {"system_name": _extract_system_name(state["query"]), "symptom": state["query"]},
-        server=prompt_server,
-    )
-    result, usage = deps.fast_llm.plan(state["query"], procedure)
-    targets = [t["target"] for t in result["tasks"]
-               if t["agent"] == "research" and t.get("target")]
-    event = {"type": "PlanCreated", "task_count": len(result["tasks"]),
+    targets = state["targets"]
+    usage, result = {"usd": 0.0}, {"needs_analysis": False, "tasks": []}
+    if state["intent"] != "runbook":
+        try:
+            prompt_server = await asyncio.wait_for(deps.mcp.find_prompt("incident_analysis_prompt"), 5)
+            procedure = await asyncio.wait_for(deps.mcp.get_prompt(
+                "incident_analysis_prompt", {"system_name": targets[0], "symptom": state["query"]}, server=prompt_server), 5)
+            result, usage = await _sync_call(deps.fast_llm.plan, state["query"] + "\n대상: " + ", ".join(targets), procedure)
+        except Exception:
+            pass  # 계획 LLM/Prompt 실패 시에도 코드로 확정한 대상은 조사한다.
+    tasks = [{"id": f"task-{i}", "agent": "research", "kind": "monitoring", "target": target, "status": "pending"}
+             for i, target in enumerate(targets) if state["intent"] != "runbook"]
+    if result.get("needs_analysis") and any(t.get("agent") == "analysis" for t in result.get("tasks", [])):
+        tasks.append({"id": "task-analysis", "agent": "analysis", "kind": "pattern-analysis", "status": "pending"})
+    event = {"type": "PlanCreated", "task_count": 1 if state["intent"] == "runbook" else len(tasks),
              "targets": targets}
-    return {"tasks": result["tasks"], "needs_analysis": result["needs_analysis"],
+    return {"tasks": tasks, "needs_analysis": result["needs_analysis"],
             "cost_usd": _cost(state, usage), "events": state["events"] + [event]}
 
 
@@ -147,26 +151,19 @@ async def research_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
     retry_total = state.get("retry_count", 0)
 
-    # URI를 코드에 하드코딩하지 않는다. 여러 MCP 서버가 연결돼 있고 그중 어느 서버가
-    # "get_incident_runbook" resource를 제공하는지 모른다고 가정하고, 먼저 연결된
-    # 서버들을 조회(list)해 유효한 서버를 찾은 뒤에만 그 서버로 요청한다.
-    needs_runbook = any(tasks[i]["kind"] != "monitoring" for i in research_indices)
-    runbook_server = runbook_uri_template = None
-    if needs_runbook:
-        runbook_server, runbook_uri_template = await deps.mcp.find_resource_template(
-            "get_incident_runbook")
-
     async def run_one(idx: int) -> dict:
         task = tasks[idx]
-        await asyncio.sleep(0.35)   # 태스크당 고정 지연 — 병렬 효과를 실측하기 위함
-        if task["kind"] == "monitoring":
-            data, retries = await with_retry(
-                deps.mcp.call_tool, "get_monitoring_status",
-                {"system_name": task["target"]})
+        attempts = 0
+        async def fetch():
+            nonlocal attempts
+            attempts += 1
+            return await asyncio.wait_for(deps.mcp.call_tool("get_monitoring_status", {"system_name": task["target"]}), 5)
+        try:
+            data, retries = await with_retry(fetch)
+            data = checked_status(data, task["target"])
             return {"idx": idx, "source": "monitoring", "data": data, "retries": retries}
-        uri = runbook_uri_template.format(incident_type=task["target"])
-        data = await deps.mcp.read_resource(uri, server=runbook_server)
-        return {"idx": idx, "source": "runbook", "data": data, "retries": 0}
+        except Exception as exc:
+            return {"idx": idx, "source": "missing", "data": "모니터링 미확보 (" + type(exc).__name__ + ")", "retries": max(0, attempts - 1)}
 
     started = time.perf_counter()
     results = await asyncio.gather(*(run_one(i) for i in research_indices))
@@ -176,8 +173,8 @@ async def research_node(state: AgentState, deps: SupervisorDeps) -> dict:
     collected = list(state.get("collected", []))
     events = list(state["events"])
     for r in results:
-        new_tasks[r["idx"]]["status"] = "done"
-        collected.append({"source": r["source"], "data": r["data"]})
+        new_tasks[r["idx"]]["status"] = "failed" if r["source"] == "missing" else "done"
+        collected.append({"source": r["source"], "data": r["data"], "target": new_tasks[r["idx"]]["target"], "evidence_id": f"E{len(collected) + 1}"})
         retry_total += r["retries"]
         events.append({"type": "TaskCompleted", "id": new_tasks[r["idx"]]["id"],
                        "source": r["source"], "target": new_tasks[r["idx"]]["target"],
@@ -186,48 +183,38 @@ async def research_node(state: AgentState, deps: SupervisorDeps) -> dict:
             "parallel_elapsed": elapsed, "events": events}
 
 
-# 수집된 모니터링 결과(상태·알림 문구)를 보고 어떤 runbook이 맞는지 고른다. LLM에게
-# 다시 묻는 대신 코드 레벨 규칙으로 판단한다 — gate(Wave 6)·replan(Wave 7)과 같은 설계
-# 원칙: 모델의 판단을 그대로 믿지 않고, 실측 데이터로 검증 가능한 결정은 코드가 내린다.
-_INCIDENT_TYPE_RULES = [
-    ("latency", "high-latency"),
-    ("pool", "high-latency"),
-    ("cpu", "cpu-spike"),
-    ("memory", "memory-leak"),
-    ("heap", "memory-leak"),
-    ("timeout", "network-timeout"),
-    ("network", "network-timeout"),
-    ("disk", "disk-full"),
-    ("down", "db-down"),
-]
-
-
-def _classify_incident_type(collected: list[dict]) -> str:
-    text = " ".join(
-        f"{c['data'].get('status', '')} " + " ".join(c["data"].get("alerts", []))
-        for c in collected if c.get("source") == "monitoring"
-    ).lower()
-    for keyword, incident_type in _INCIDENT_TYPE_RULES:
-        if keyword in text:
-            return incident_type
-    return "db-down"   # 매칭되는 증상이 없으면 가장 일반적인 장애 대응 절차로 폴백
-
-
 @traceable(name="replan_check_node")
 async def replan_check_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 7 — 1차 수집 결과 평가. runbook이 없으면 gap task만 추가해 재조사."""
-    has_runbook = any(c["source"] == "runbook" for c in state.get("collected", []))
-    rounds = state.get("replan_rounds", 0)
-    if has_runbook or rounds >= 1:
-        verdict = {"type": "ReplanCheck", "round": rounds, "is_sufficient": True}
-        return {"events": state["events"] + [verdict]}
-    incident_type = _classify_incident_type(state.get("collected", []))
-    gap_task = {"id": "task-gap-runbook", "agent": "research", "kind": "runbook",
-                "target": incident_type, "status": "pending"}
-    verdict = {"type": "ReplanCheck", "round": rounds, "is_sufficient": False,
-               "gap_task": gap_task["id"], "target": incident_type}
-    return {"tasks": state["tasks"] + [gap_task], "replan_rounds": rounds + 1,
-            "events": state["events"] + [verdict]}
+    """고정 유형 기본값 대신 실제 증상·알림으로 런북을 검색한다."""
+    collected = list(state.get("collected", []))
+    events = list(state["events"])
+    queries = []
+    for observation in [c for c in collected if c["source"] == "monitoring" and not c["data"]["stale"]]:
+        target, alerts = observation["target"], observation["data"]["alerts"]
+        if len(state["targets"]) > 1:
+            if not alerts:
+                collected.append({"source": "missing", "target": target, "data": "알림이 없어 대표 런북을 선택하지 않음"})
+                continue
+            # ponytail: 첫 알림을 대표로 사용; 알림 우선순위·개별 증상 분리는 복합 장애 지원 시 추가.
+            query = target + "\n모니터링 알림에 대한 장애 대응 절차: " + alerts[0]
+        else:
+            query = state["query"] + "\n" + " ".join(alerts)
+        queries.append((target, query))
+    if state["intent"] == "runbook":
+        queries = [("일반 절차", state["query"])]
+    for target, query in queries:
+        try:
+            documents = await asyncio.wait_for(deps.retriever.search(query), 65)
+            for doc in documents:
+                collected.append({"source": "runbook", "data": doc["text"], "doc_id": doc["doc_id"],
+                                  "target": target, "evidence_id": f"E{len(collected) + 1}"})
+            events.append({"type": "RetrievalCompleted", "target": target, "doc_ids": [d["doc_id"] for d in documents]})
+            if not documents:
+                collected.append({"source": "missing", "target": target, "data": "일치하는 런북 근거 없음"})
+        except Exception as exc:
+            collected.append({"source": "missing", "target": target, "data": "런북 검색 미확보 (" + type(exc).__name__ + ")"})
+    events.append({"type": "ReplanCheck", "round": 0, "is_sufficient": True})
+    return {"collected": collected, "events": events}
 
 
 @traceable(name="analysis_node")
@@ -240,7 +227,13 @@ async def analysis_node(state: AgentState, deps: SupervisorDeps) -> dict:
     if not pending:
         return {"events": state["events"] +
                 [{"type": "AnalysisSkipped", "reason": "analysis task 0개"}]}
-    summary, usage = deps.fast_llm.analyze(state.get("collected", []))
+    monitoring = [c for c in state.get("collected", []) if c["source"] == "monitoring" and not c["data"]["stale"]]
+    if len(monitoring) < 2:
+        return {"events": state["events"] + [{"type": "AnalysisSkipped", "reason": "비교할 최신 관측 부족"}]}
+    try:
+        summary, usage = await _sync_call(deps.fast_llm.analyze, monitoring)
+    except Exception:
+        return {"events": state["events"] + [{"type": "AnalysisSkipped", "reason": "분석 응답 미확보"}]}
     new_tasks = [dict(t) for t in tasks]
     for t in new_tasks:
         if t["agent"] == "analysis" and t["status"] == "pending":
@@ -253,18 +246,17 @@ async def analysis_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
 @traceable(name="write_node")
 async def write_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 8/10a — 고품질 모델로 초안 작성 (1차는 의도적 저품질).
-
-    토큰마다 attempt 번호를 같이 실어 보낸다 — validate가 반려해 재작성(attempt 증가)
-    될 때 프론트가 새 말풍선으로 끊어서 보여줄 수 있게 하기 위함(Wave 8 재작성 루프를
-    그대로 노출)."""
+    """초안은 내부에만 보관한다. 생성 실패해도 관측 사실을 지우지 않는다."""
     attempt = state.get("validation_attempts", 0) + 1
-    writer = get_stream_writer()
-    draft, usage = await deps.quality_llm.write(
-        state["query"], state.get("collected", []),
-        attempt, state.get("validation_feedback"),
-        on_token=lambda piece: writer(
-            {"type": "AnswerToken", "attempt": attempt, "delta": piece}))
+    collected = [c for c in state.get("collected", []) if c["source"] in {"runbook", "analysis"}
+                 or c["source"] == "monitoring" and not c["data"]["stale"]]
+    draft, usage = "", {"usd": 0.0}
+    if any(c["source"] == "runbook" for c in collected):
+        try:
+            draft, usage = await asyncio.wait_for(deps.quality_llm.write(
+                state["query"], collected, attempt, state.get("validation_feedback")), timeout=120)
+        except Exception:
+            pass  # 생성 실패 시에도 확인된 관측·런북은 반환한다.
     return {"draft": draft, "last_prompt": usage.get("prompt"),
             "cost_usd": _cost(state, usage),
             "events": state["events"] + [{"type": "DraftWritten", "attempt": attempt,
@@ -273,32 +265,31 @@ async def write_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
 @traceable(name="validate_node")
 async def validate_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 8 — 코드 기준 검증: 30자 이상 + 절차 번호 포함이어야 합격."""
-    draft = state["draft"]
+    """생성 수치·상태 단정은 제거하고, 재작성은 한 번만 허용한다."""
     attempts = state.get("validation_attempts", 0) + 1
-    ok = len(draft) >= 30 and "1)" in draft
-    verdict = "합격" if ok else "불합격"
-    if not ok and attempts >= 3:   # 실모델 무한 재작성 방지 — 최대 3회 후 통과 처리
-        ok, verdict = True, "합격(최대 시도 도달 — 통과 처리)"
-    feedback = None if ok else (
-        f"응답이 너무 짧습니다({len(draft)}자, 최소 30자). 절차를 1) 2) 3) 번호로 "
-        f"구체적으로 설명하세요.")
+    notes, rejected = safe_notes(state["draft"], state["targets"])
+    feedback = "관측 수치·상태·원인을 단정하지 말고, 숫자 없이 원인 후보와 확인 절차만 설명하세요." if rejected and attempts < 2 else None
+    verdict = "불합격" if feedback else "제한 응답" if rejected else "합격"
     event = {"type": "Validation", "attempt": attempts, "verdict": verdict}
-    return {"validation_attempts": attempts, "validation_feedback": feedback,
+    return {"validation_attempts": attempts, "validation_feedback": feedback, "validated_notes": notes,
             "events": state["events"] + [event]}
 
 
 @traceable(name="finalize_node")
 async def finalize_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    return {"final": state["draft"],
+    return {"final": render_answer(state.get("collected", []), state.get("validated_notes", ""), state["intent"]),
             "events": state["events"] + [{"type": "Finalize", "pipeline": "incident-v2"}]}
 
 
 def _after_route(state: AgentState) -> str:
+    if state.get("final"):
+        return "done"
     return "chat_answer" if state["route"] == "chat" else "plan"
 
 
 def _after_replan_check(state: AgentState) -> str:
+    if state["intent"] == "runbook":
+        return "finalize"
     last = state["events"][-1]
     return "analysis" if last.get("is_sufficient") else "research"
 
@@ -323,13 +314,13 @@ def build_graph(deps: SupervisorDeps):
 
     g.set_entry_point("route")
     g.add_conditional_edges("route", _after_route,
-                            {"chat_answer": "chat_answer", "plan": "plan"})
+                            {"chat_answer": "chat_answer", "plan": "plan", "done": END})
     g.add_edge("chat_answer", END)
     g.add_edge("plan", "gate")
     g.add_edge("gate", "research")
     g.add_edge("research", "replan_check")
     g.add_conditional_edges("replan_check", _after_replan_check,
-                            {"analysis": "analysis", "research": "research"})
+                            {"analysis": "analysis", "research": "research", "finalize": "finalize"})
     g.add_edge("analysis", "write")
     g.add_edge("write", "validate")
     g.add_conditional_edges("validate", _after_validate,

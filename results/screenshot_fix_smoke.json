@@ -1,0 +1,389 @@
+{
+  "purpose": "캡처 질문 재확인, 공식 Before/After 아님",
+  "backend": "ollama",
+  "generation_model": "qwen3.5:2b",
+  "embedding_model": "bge-m3",
+  "monitoring": "실제 MCP 호출, 실습용 합성 데이터+jitter",
+  "results": [
+    {
+      "case": "cpu",
+      "seconds": 50.45,
+      "turns": [
+        {
+          "question": "payments-service CPU가 급증했어요. 원인 확인해줘",
+          "reply": "확인된 사실\n[E1] payments-service: 상태=degraded, CPU 93.8%, 메모리 56.4%, 관측 2026-10-20T13:55:26.339820\n\n참고 런북\n[E2] payments-service / cpu-spike — Runbook: CPU 급증 대응 절차 (참고 절차)\n- get_monitoring_status로 현재 CPU 사용률과 알림을 확인한다. 최근 배포/트래픽 변화 시점은 별도 배포 기록과 트래픽 대시보드에서 확인한다.\n- 반복 호출, 배치 작업 중복 실행 같은 특정 요청 패턴이 원인인지 최근 로그에서 확인한다.\n\n원인 판단\n현재 근거만으로 원인을 특정할 수 없습니다. 참고 런북의 점검 항목을 확인해 주세요.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "diagnose",
+              "targets": [
+                "payments-service"
+              ]
+            },
+            {
+              "type": "PlanCreated",
+              "task_count": 2,
+              "targets": [
+                "payments-service"
+              ]
+            },
+            {
+              "type": "GateApplied",
+              "removed_analysis_tasks": 0
+            },
+            {
+              "type": "TaskCompleted",
+              "id": "task-0",
+              "source": "monitoring",
+              "target": "payments-service",
+              "retries": 1
+            },
+            {
+              "type": "RetrievalCompleted",
+              "target": "payments-service",
+              "doc_ids": [
+                "cpu-spike"
+              ]
+            },
+            {
+              "type": "ReplanCheck",
+              "round": 0,
+              "is_sufficient": true
+            },
+            {
+              "type": "AnalysisSkipped",
+              "reason": "비교할 최신 관측 부족"
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 1,
+              "length": 123
+            },
+            {
+              "type": "Validation",
+              "attempt": 1,
+              "verdict": "불합격"
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 2,
+              "length": 136
+            },
+            {
+              "type": "Validation",
+              "attempt": 2,
+              "verdict": "제한 응답"
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "incident-v2"
+            }
+          ],
+          "targets": [
+            "payments-service"
+          ],
+          "intent": "diagnose"
+        }
+      ]
+    },
+    {
+      "case": "resume",
+      "seconds": 36.41,
+      "turns": [
+        {
+          "question": "응답이 느려요",
+          "reply": "어느 서비스인가요? 등록된 서비스: auth-service, web-01, payments-service, cache-service, gateway-service, log-service",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "clarify",
+              "targets": []
+            }
+          ],
+          "targets": [],
+          "intent": "clarify"
+        },
+        {
+          "question": "cache-service야",
+          "reply": "확인된 사실\n[E1] cache-service: 상태=degraded, CPU 39.9%, 메모리 88.0%, 관측 2026-10-20T13:58:15.057674\n\n참고 런북\n[E2] cache-service / high-latency — Runbook: 응답 지연(High Latency) 대응 절차 (참고 절차)\n- get_monitoring_status로 서비스의 현재 상태와 알림을 확인한다. p95 지연시간과 커넥션 풀 사용률은 별도 APM과 DB 대시보드에서 확인한다.\n- 정상화 후 느린 쿼리 로그를 분석해 근본 원인을 문서화하고 후속 최적화 티켓을 등록한다.\n\n원인 판단\n현재 근거만으로 원인을 특정할 수 없습니다. 참고 런북의 점검 항목을 확인해 주세요.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "diagnose",
+              "targets": [
+                "cache-service"
+              ]
+            },
+            {
+              "type": "PlanCreated",
+              "task_count": 2,
+              "targets": [
+                "cache-service"
+              ]
+            },
+            {
+              "type": "GateApplied",
+              "removed_analysis_tasks": 0
+            },
+            {
+              "type": "TaskCompleted",
+              "id": "task-0",
+              "source": "monitoring",
+              "target": "cache-service",
+              "retries": 1
+            },
+            {
+              "type": "RetrievalCompleted",
+              "target": "cache-service",
+              "doc_ids": [
+                "high-latency"
+              ]
+            },
+            {
+              "type": "ReplanCheck",
+              "round": 0,
+              "is_sufficient": true
+            },
+            {
+              "type": "AnalysisSkipped",
+              "reason": "비교할 최신 관측 부족"
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 1,
+              "length": 105
+            },
+            {
+              "type": "Validation",
+              "attempt": 1,
+              "verdict": "불합격"
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 2,
+              "length": 218
+            },
+            {
+              "type": "Validation",
+              "attempt": 2,
+              "verdict": "제한 응답"
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "incident-v2"
+            }
+          ],
+          "targets": [
+            "cache-service"
+          ],
+          "intent": "diagnose"
+        }
+      ]
+    },
+    {
+      "case": "unregistered",
+      "seconds": 2.27,
+      "turns": [
+        {
+          "question": "billing-service 응답이 느려요",
+          "reply": "미등록 서비스: billing-service. 등록된 서비스명을 확인해 주세요: auth-service, web-01, payments-service, cache-service, gateway-service, log-service",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "clarify",
+              "targets": []
+            }
+          ],
+          "targets": [],
+          "intent": "clarify"
+        }
+      ]
+    },
+    {
+      "case": "procedure",
+      "seconds": 2.52,
+      "turns": [
+        {
+          "question": "DB 다운 절차 알려줘",
+          "reply": "일반 대응 절차입니다. 현재 장애나 원인을 확인한 결과는 아닙니다.\n\n참고 런북\n[E1] 일반 절차 / db-down — Runbook: DB Down 대응 절차 (참고 절차)\n- 등록된 서비스의 현재 상태와 알림은 get_monitoring_status로 확인한다. DB 장애 여부는 별도 DB 모니터링에서 확인한다.\n- 커넥션 풀/리플리케이션 상태를 점검하고 필요 시 failover 노드로 전환한다.\n- 서비스 정상화 확인 후 원인 분석과 재발 방지 대책을 문서화한다.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "runbook",
+              "targets": []
+            },
+            {
+              "type": "PlanCreated",
+              "task_count": 1,
+              "targets": []
+            },
+            {
+              "type": "GateApplied",
+              "removed_analysis_tasks": 0
+            },
+            {
+              "type": "ResearchSkipped",
+              "reason": "pending research task 0개"
+            },
+            {
+              "type": "RetrievalCompleted",
+              "target": "일반 절차",
+              "doc_ids": [
+                "db-down"
+              ]
+            },
+            {
+              "type": "ReplanCheck",
+              "round": 0,
+              "is_sufficient": true
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "incident-v2"
+            }
+          ],
+          "targets": [],
+          "intent": "runbook"
+        }
+      ]
+    },
+    {
+      "case": "multiple",
+      "seconds": 48.19,
+      "turns": [
+        {
+          "question": "payments-service와 cache-service 상태를 각각 확인해 줘",
+          "reply": "확인된 사실\n[E1] cache-service: 상태=degraded, CPU 43.9%, 메모리 89.9%, 관측 2026-10-20T14:01:53.614381\n[E2] payments-service: 상태=degraded, CPU 95.0%, 메모리 57.0%, 관측 2026-10-20T14:01:53.303040\n\n참고 런북\n[E3] cache-service / memory-leak — Runbook: 메모리 누수(Memory Leak) 대응 절차 (참고 절차)\n- get_monitoring_status로 현재 메모리 사용률과 알림을 확인한다. 시간별 메모리 추세는 별도 모니터링 대시보드에서 확인하며, 단일 관측만으로 누수를 확정하지 않는다.\n- 힙 덤프 또는 프로파일링 도구로 어떤 객체가 계속 쌓이는지 확인한다.\n\n[E4] payments-service / cpu-spike — Runbook: CPU 급증 대응 절차 (참고 절차)\n- get_monitoring_status로 현재 CPU 사용률과 알림을 확인한다. 최근 배포/트래픽 변화 시점은 별도 배포 기록과 트래픽 대시보드에서 확인한다.\n- 반복 호출, 배치 작업 중복 실행 같은 특정 요청 패턴이 원인인지 최근 로그에서 확인한다.\n\n원인 후보·확인 사항 (추정)\ncache-service 는 메모리 사용률이 급격히 상승하고 힙이 거의 가득 차 있어 메모리 누수나 캐시 무제한 증가 등 원인이 있을 가능성이 있습니다.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "diagnose",
+              "targets": [
+                "cache-service",
+                "payments-service"
+              ]
+            },
+            {
+              "type": "PlanCreated",
+              "task_count": 3,
+              "targets": [
+                "cache-service",
+                "payments-service"
+              ]
+            },
+            {
+              "type": "GateApplied",
+              "removed_analysis_tasks": 0
+            },
+            {
+              "type": "TaskCompleted",
+              "id": "task-0",
+              "source": "monitoring",
+              "target": "cache-service",
+              "retries": 1
+            },
+            {
+              "type": "TaskCompleted",
+              "id": "task-1",
+              "source": "monitoring",
+              "target": "payments-service",
+              "retries": 0
+            },
+            {
+              "type": "RetrievalCompleted",
+              "target": "cache-service",
+              "doc_ids": [
+                "memory-leak"
+              ]
+            },
+            {
+              "type": "RetrievalCompleted",
+              "target": "payments-service",
+              "doc_ids": [
+                "cpu-spike"
+              ]
+            },
+            {
+              "type": "ReplanCheck",
+              "round": 0,
+              "is_sufficient": true
+            },
+            {
+              "type": "AnalysisCompleted",
+              "length": 88
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 1,
+              "length": 229
+            },
+            {
+              "type": "Validation",
+              "attempt": 1,
+              "verdict": "불합격"
+            },
+            {
+              "type": "DraftWritten",
+              "attempt": 2,
+              "length": 183
+            },
+            {
+              "type": "Validation",
+              "attempt": 2,
+              "verdict": "제한 응답"
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "incident-v2"
+            }
+          ],
+          "targets": [
+            "cache-service",
+            "payments-service"
+          ],
+          "intent": "diagnose"
+        }
+      ]
+    },
+    {
+      "case": "name",
+      "seconds": 0.01,
+      "turns": [
+        {
+          "question": "제 이름은 기준입니다",
+          "reply": "반갑습니다, 기준님. 이 대화에서 이름을 기억하겠습니다.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "chat",
+              "targets": []
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "name-recall"
+            }
+          ],
+          "targets": [],
+          "intent": "chat"
+        },
+        {
+          "question": "제 이름이 뭐였죠?",
+          "reply": "기준님이라고 알려주셨습니다.",
+          "events": [
+            {
+              "type": "RouteDecided",
+              "route": "chat",
+              "targets": []
+            },
+            {
+              "type": "Finalize",
+              "pipeline": "name-recall"
+            }
+          ],
+          "targets": [],
+          "intent": "chat"
+        }
+      ]
+    }
+  ]
+}

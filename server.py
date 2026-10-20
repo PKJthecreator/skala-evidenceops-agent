@@ -27,6 +27,7 @@ from agent.fake_llm import FastLLM, QualityLLM
 from agent.graph import build_graph
 from agent.mcp_client import MCPClient
 from agent.session_store import SqliteSessionStore
+from agent.retrieval import RunbookSearch
 from agent.supervisor_v1 import run_v1
 
 CREATION_COUNT = 0   # Wave 1 — 프로세스 내 Agent 번들 생성 횟수 (항상 1이어야 정상)
@@ -42,9 +43,9 @@ def _build_llms():
     backend = os.environ.get("LLM_BACKEND", "fake")
     if backend == "ollama":
         from agent.ollama_llm import OllamaFastLLM, OllamaQualityLLM
-        fast = OllamaFastLLM(os.environ.get("OLLAMA_FAST_MODEL", "qwen3:0.6b"),
+        fast = OllamaFastLLM(os.environ.get("OLLAMA_FAST_MODEL", "qwen3.5:2b"),
                              usd_per_1k_tokens=0.00015)
-        quality = OllamaQualityLLM(os.environ.get("OLLAMA_QUALITY_MODEL", "qwen3:8b"),
+        quality = OllamaQualityLLM(os.environ.get("OLLAMA_QUALITY_MODEL", "qwen3.5:2b"),
                                    usd_per_1k_tokens=0.005)
         return backend, fast, quality
     if backend == "openai":
@@ -71,15 +72,18 @@ async def lifespan(app: FastAPI):
         fast_llm=fast_llm,
         quality_llm=quality_llm,
         mcp=mcp,
-        session_store=SqliteSessionStore(),
+        session_store=SqliteSessionStore() if not os.getenv("SESSION_DB") else SqliteSessionStore(os.environ["SESSION_DB"]),
         version=os.environ.get("SUPERVISOR_VERSION", "v2"),
+        retriever=RunbookSearch(),
     )
     app.state.deps = deps
     app.state.graph = build_graph(deps) if deps.version == "v2" else None
     app.state.instance_id = id(deps)
-    yield
-    await mcp.stop()
-    deps.session_store.close()
+    try:
+        yield
+    finally:
+        await mcp.stop()
+        deps.session_store.close()
     try:   # 종료 전 LangSmith 배치 전송 플러시 — kill 시 run이 pending으로 남는 것 방지
         from langchain_core.tracers.langchain import wait_for_all_tracers
         wait_for_all_tracers()
@@ -108,6 +112,8 @@ async def version():
 def _metadata(result: dict, run_id: str | None) -> dict:
     return {
         "route": result.get("route"),
+        "intent": result.get("intent"),
+        "targets": result.get("targets", []),
         "task_count": len(result.get("tasks", [])),
         "gate_removed": result.get("gate_removed", 0),
         "replan_rounds": result.get("replan_rounds", 0),
@@ -164,15 +170,13 @@ async def chat_stream(message: str, thread_id: str = "default"):
         else:
             seen = 0
             final = ""
-            last_prompt = None   # finalize까지 살아남은 최종 write/chat 호출의 실제 프롬프트
-            # stream_mode를 리스트로 주면 (mode, payload) 튜플이 나온다 — "updates"는
-            # 노드가 끝날 때마다의 상태 델타, "custom"은 write_node/chat_answer_node가
-            # get_stream_writer()로 실행 중에 즉시 흘려보내는 토큰(AnswerToken) 이벤트다.
+            # 노드 진행 상황과 최종 답변만 전달하고, 초안 토큰은 차단한다.
             async for mode, payload in app.state.graph.astream(
                     {"query": message, "thread_id": thread_id, "history": history,
                      "events": [], "cost_usd": 0.0}, stream_mode=["updates", "custom"]):
                 if mode == "custom":
-                    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                    if payload.get("type") != "AnswerToken":
+                        yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                     continue
                 for node_name, delta in payload.items():
                     for ev in (delta.get("events") or [])[seen:]:
@@ -182,9 +186,7 @@ async def chat_stream(message: str, thread_id: str = "default"):
                         seen = len(delta["events"])
                     if delta.get("final"):
                         final = delta["final"]
-                    if delta.get("last_prompt"):
-                        last_prompt = delta["last_prompt"]
-            yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': final, 'prompt': last_prompt}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': final}, ensure_ascii=False)}\n\n"
             deps.session_store.append(thread_id, "user", message)
             deps.session_store.append(thread_id, "assistant", final)
         yield "data: [DONE]\n\n"

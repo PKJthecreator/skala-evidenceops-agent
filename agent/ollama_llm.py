@@ -1,23 +1,31 @@
 """LLM_BACKEND=ollama — 로컬 Ollama 실모델 백엔드 (fake_llm과 동일 인터페이스).
 
-Wave 10a 구도를 실물로: fast(기본 qwen3:0.6b)는 분류·계획·단순 대화, quality(기본
-qwen3:8b)는 최종 답변 작성 전담. Ollama의 구조화 출력(format=<JSON Schema>)과
+fast는 분류·계획·단순 대화, quality는 응답 작성 전담이며 기본 모델은 같은 qwen3.5:2b다.
+Ollama의 구조화 출력(format=<JSON Schema>)과
 temperature=0으로 변동을 줄이지만 실모델이므로 결정론은 아니다 — 그래서 gate(W6)·
 replan(W7)·validator(W8)가 연출이 아니라 실제 방어선으로 동작한다.
 fc
 비용(cost_usd)은 '가상 단가 × 실측 토큰 수(prompt_eval_count+eval_count)'다 — 로컬
 추론이라 실제 과금은 0이지만, W10a의 모델 분리 효과를 같은 잣대로 비교하기 위함이다.
 
-사전 조건: `ollama serve` 실행 중 + `ollama pull qwen3:0.6b qwen3:8b`.
+사전 조건: Ollama 실행 및 사용할 모델 설치.
 """
 import json
+import os
 import re
 from pathlib import Path
 
 import httpx
 from langsmith import traceable
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+from .evidence import WRITER_INSTRUCTIONS
+
+OLLAMA_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/") + "/api/chat"
+
+
+def generation_options() -> dict:
+    return {"temperature": 0.0, "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "8192")),
+            "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "700"))}
 
 
 def _load_known_systems() -> set[str]:
@@ -26,7 +34,7 @@ def _load_known_systems() -> set[str]:
     log-service 미인식) 수정."""
     path = Path(__file__).resolve().parent.parent / "data" / "monitoring.json"
     try:
-        return set(json.loads(path.read_text()).keys())
+        return set(json.loads(path.read_text(encoding="utf-8")).keys())
     except (OSError, json.JSONDecodeError):
         return {"auth-service", "web-01"}
 
@@ -97,11 +105,12 @@ class OllamaLLM:
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": user}],
             "stream": False,
-            "options": {"temperature": 0.0},
+            "think": os.getenv("OLLAMA_THINK", "false").lower() == "true",
+            "options": generation_options(),
         }
         if schema is not None:
             payload["format"] = schema
-        resp = httpx.post(OLLAMA_URL, json=payload, timeout=300.0)
+        resp = httpx.post(OLLAMA_URL, json=payload, timeout=120.0)
         resp.raise_for_status()
         data = resp.json()
         content = data["message"]["content"]
@@ -120,11 +129,12 @@ class OllamaLLM:
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": user}],
             "stream": True,
-            "options": {"temperature": 0.0},
+            "think": os.getenv("OLLAMA_THINK", "false").lower() == "true",
+            "options": generation_options(),
         }
         chunks: list[str] = []
         usage = {"model": self.name, "tokens": 0, "usd": 0.0}
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream("POST", OLLAMA_URL, json=payload) as resp:
                 resp.raise_for_status()
                 async for line in resp.aiter_lines():
@@ -241,21 +251,8 @@ class OllamaQualityLLM(OllamaLLM):
     @traceable(run_type="llm", name="ollama_quality.write")
     async def write(self, query: str, collected: list[dict], attempt: int,
               feedback: str | None, on_token=None) -> tuple[str, dict]:
-        system = ("당신은 ICT 운영 보고 작성자다. 수집된 사실만 사용해 한국어로 "
-                  "간결한 대응 보고를 작성하라. 반드시 '1) ... 2) ... 3) ...' 형식의 "
-                  "번호 절차로 답하고, 수치는 수집된 값을 그대로 인용하라.")
-        facts = []
-        for c in collected:
-            if c["source"] == "monitoring":
-                d = c["data"]
-                facts.append(f"- 모니터링 {d['system_name']}: 상태={d['status']}, "
-                             f"CPU {d['cpu_percent']}%, 메모리 {d['memory_percent']}%, "
-                             f"알림 {len(d['alerts'])}건 {d['alerts']}")
-            elif c["source"] == "runbook":
-                facts.append(f"- runbook 발췌:\n{c['data'].strip()}")
-            elif c["source"] == "analysis":
-                facts.append(f"- 패턴 분석: {c['data'].strip()}")
-        user = f"## 사용자 요청\n{query}\n\n## 수집된 사실\n" + "\n".join(facts)
+        system = WRITER_INSTRUCTIONS
+        user = f"## 사용자 요청\n{query}\n\n## 수집된 근거\n" + json.dumps(collected, ensure_ascii=False)
         if feedback:
             user += f"\n\n## 이전 초안에 대한 검증 반려 사유 (반드시 반영)\n{feedback}"
         return await self._chat_stream(system, user, on_token=on_token)

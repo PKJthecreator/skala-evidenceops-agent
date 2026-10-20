@@ -74,6 +74,8 @@ class MCPClient:
             raise asyncio.TimeoutError("simulated transient timeout (Wave 9 demo)")
         async with self._lock:
             result = await self.sessions[server].call_tool(name, arguments)
+        if getattr(result, "isError", False) or getattr(result, "is_error", False):
+            raise ValueError("MCP Tool returned an error")
         return json.loads(result.content[0].text)
 
     @traceable(run_type="tool", name="mcp.list_resource_templates")

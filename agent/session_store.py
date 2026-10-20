@@ -17,6 +17,7 @@ class SqliteSessionStore:
             "CREATE TABLE IF NOT EXISTS messages ("
             " thread_id TEXT, role TEXT, content TEXT, created TEXT)"
         )
+        self.conn.execute("CREATE TABLE IF NOT EXISTS pending (thread_id TEXT PRIMARY KEY, query TEXT NOT NULL)")
         self.conn.commit()
 
     def load(self, thread_id: str) -> list[dict]:
@@ -35,3 +36,14 @@ class SqliteSessionStore:
 
     def close(self) -> None:
         self.conn.close()
+
+    def get_pending(self, thread_id: str) -> str | None:
+        row = self.conn.execute("SELECT query FROM pending WHERE thread_id=?", (thread_id,)).fetchone()
+        return row[0] if row else None
+
+    def set_pending(self, thread_id: str, query: str | None) -> None:
+        if query is None:
+            self.conn.execute("DELETE FROM pending WHERE thread_id=?", (thread_id,))
+        else:
+            self.conn.execute("INSERT OR REPLACE INTO pending VALUES (?, ?)", (thread_id, query))
+        self.conn.commit()

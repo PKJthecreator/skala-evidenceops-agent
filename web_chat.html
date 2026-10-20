@@ -117,12 +117,13 @@ const { createApp, ref, reactive, nextTick } = Vue;
 const STEP_LABELS = {
   PlanCreated: e => `계획 수립: 할 일 ${e.task_count}가지${e.targets?.length ? ` (시스템: ${e.targets.join(', ')})` : ''}`,
   GateApplied: e => e.removed_analysis_tasks ? `불필요한 작업 ${e.removed_analysis_tasks}건 제거` : null,
-  TaskCompleted: e => (e.source === 'monitoring'
+  TaskCompleted: e => e.source === 'missing' ? `모니터링 미확보 (시스템: ${e.target})` : (e.source === 'monitoring'
       ? `모니터링 지표 확인 (시스템: ${e.target})`
       : `대응 매뉴얼(runbook) 조회 (장애유형: ${e.target})`) + (e.retries ? ' (재시도 성공)' : ''),
   ReplanCheck: e => e.is_sufficient ? null : `정보 부족 → 장애유형 "${e.target}"로 추가 조사`,
   DraftWritten: e => `답변 초안 작성 (시도 ${e.attempt})`,
-  Validation: e => e.verdict === '합격' ? '검수 통과' : '검수 반려 → 다시 작성',
+  Validation: e => e.verdict === '합격' ? '검수 통과' : e.verdict === '제한 응답' ? '확인된 근거만 표시' : '검수 반려 → 다시 작성',
+  RetrievalCompleted: e => `런북 검색 (${e.target}): ${e.doc_ids.join(', ') || '일치 근거 없음'}`,
   Finalize: () => '최종 답변 완성',
 };
 
@@ -137,7 +138,7 @@ createApp({
     let nextId = 0;
 
     fetch('/health').then(r => r.json()).then(h => {
-      backendLabel.value = `${h.llm_backend} 실모델(${h.fast_llm}/${h.quality_llm}) · all_total_vue`;
+      backendLabel.value = h.llm_backend === 'fake' ? '흐름 테스트 (fake)' : `${h.llm_backend} (${h.fast_llm}/${h.quality_llm})`;
     }).catch(() => {});
 
     async function scrollToBottom() {
