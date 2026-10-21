@@ -83,7 +83,7 @@
   "results": [
     {
       "case": "payments",
-      "seconds": 26.033,
+      "seconds": 34.407,
       "queried_targets": [
         "payments-service"
       ],
@@ -163,12 +163,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.35,
+            "parallel_elapsed": 0.36,
             "validation_attempts": 1,
             "cost_usd": 0.002598,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -177,7 +177,7 @@
     },
     {
       "case": "cache",
-      "seconds": 23.02,
+      "seconds": 26.784,
       "queried_targets": [
         "cache-service"
       ],
@@ -257,12 +257,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.36,
+            "parallel_elapsed": 0.35,
             "validation_attempts": 1,
             "cost_usd": 0.002851,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -271,7 +271,7 @@
     },
     {
       "case": "disk",
-      "seconds": 19.258,
+      "seconds": 23.602,
       "queried_targets": [
         "log-service"
       ],
@@ -351,12 +351,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.35,
+            "parallel_elapsed": 0.36,
             "validation_attempts": 1,
             "cost_usd": 0.002281,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -365,7 +365,7 @@
     },
     {
       "case": "upstream",
-      "seconds": 23.204,
+      "seconds": 25.975,
       "queried_targets": [
         "gateway-service",
         "payments-service"
@@ -460,7 +460,7 @@
             "cost_usd": 0.002702,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -469,7 +469,7 @@
     },
     {
       "case": "two-targets",
-      "seconds": 21.138,
+      "seconds": 24.723,
       "queried_targets": [
         "auth-service"
       ],
@@ -555,7 +555,7 @@
             "cost_usd": 0.00268,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -564,7 +564,7 @@
     },
     {
       "case": "common-cause",
-      "seconds": 20.912,
+      "seconds": 24.529,
       "queried_targets": [
         "payments-service",
         "cache-service"
@@ -660,7 +660,7 @@
             "cost_usd": 0.002502,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -669,7 +669,7 @@
     },
     {
       "case": "alias",
-      "seconds": 19.895,
+      "seconds": 23.081,
       "queried_targets": [
         "auth-service"
       ],
@@ -754,7 +754,7 @@
             "cost_usd": 0.002517,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -763,7 +763,7 @@
     },
     {
       "case": "unregistered",
-      "seconds": 18.642,
+      "seconds": 22.74,
       "queried_targets": [
         "auth-service"
       ],
@@ -839,12 +839,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.36,
+            "parallel_elapsed": 0.35,
             "validation_attempts": 1,
             "cost_usd": 0.00256,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -853,7 +853,7 @@
     },
     {
       "case": "chat",
-      "seconds": 3.368,
+      "seconds": 3.76,
       "queried_targets": [],
       "expected_targets": [],
       "expected_runbooks": [],
@@ -881,7 +881,7 @@
             "cost_usd": 3.1e-05,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -890,7 +890,7 @@
     },
     {
       "case": "memory",
-      "seconds": 7.404,
+      "seconds": 7.441,
       "queried_targets": [],
       "expected_targets": [],
       "expected_runbooks": [],
@@ -918,7 +918,7 @@
             "cost_usd": 3e-05,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         },
@@ -945,7 +945,7 @@
             "cost_usd": 3.2e-05,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -954,7 +954,7 @@
     },
     {
       "case": "clarify-resume",
-      "seconds": 37.414,
+      "seconds": 39.2,
       "queried_targets": [
         "auth-service",
         "payments-service"
@@ -1035,12 +1035,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.37,
+            "parallel_elapsed": 0.36,
             "validation_attempts": 1,
             "cost_usd": 0.00264,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         },
@@ -1113,12 +1113,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.37,
+            "parallel_elapsed": 0.36,
             "validation_attempts": 1,
             "cost_usd": 0.002496,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -1127,7 +1127,7 @@
     },
     {
       "case": "similar-runbooks",
-      "seconds": 19.861,
+      "seconds": 20.332,
       "queried_targets": [
         "gateway-service"
       ],
@@ -1207,12 +1207,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.36,
+            "parallel_elapsed": 0.35,
             "validation_attempts": 1,
             "cost_usd": 0.002472,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -1221,7 +1221,7 @@
     },
     {
       "case": "wrong-number",
-      "seconds": 10.232,
+      "seconds": 10.634,
       "queried_targets": [
         "payments-service"
       ],
@@ -1301,12 +1301,12 @@
             "gate_removed": 0,
             "replan_rounds": 1,
             "retry_count": 0,
-            "parallel_elapsed": 0.35,
+            "parallel_elapsed": 0.36,
             "validation_attempts": 1,
             "cost_usd": 7.1e-05,
             "llm_backend": "ollama",
             "supervisor_version": "v2",
-            "instance_id": 2514882856528,
+            "instance_id": 2251048504544,
             "langsmith_run_id": null
           }
         }
@@ -1315,7 +1315,7 @@
     },
     {
       "case": "partial-failure",
-      "seconds": 8.901,
+      "seconds": 9.117,
       "error": "ValueError"
     }
   ]

@@ -18,7 +18,7 @@
 | 로컬 Ollama | 0.40.6 응답 확인, 설치된 qwen3.5:2b의 한국어 구조화 분류 요청 통과 |
 | 실제 모델 단일 사례 | 실제 MCP·Ollama·임베딩으로 payments-service 질의 통과, `results/format_fix_smoke.md` |
 | 캡처 질의 재확인 | 실제 로컬 MCP·Ollama·임베딩으로 6개 시나리오·8개 발화 통과, `results/screenshot_fix_smoke.json`·`.md` |
-| 정량 Before/After | 아직 미측정 |
+| 정량 Before/After | 14개 시나리오 측정 완료, [결과](../results/before_after.md) |
 
 단일 사례 확인은 전체 평가셋의 품질이나 공식 지연 측정 결과를 대신하지 않는다.
 
@@ -26,21 +26,14 @@
 
 1. 초기 의존성 다운로드 실패는 사용자 설치 후 해결됐다. 현재 그래프·SSE 테스트를 실행할 수 있다.
 2. 생성 모델 qwen3.5:2b와 임베딩 모델 bge-m3가 준비됐으며, 실제 검색과 응답 생성의 단일 사례를 확인했다.
-3. Git 저장소 초기화는 됐지만 `.git/index.lock` 쓰기 권한이 없어 커밋·태그는 만들지 못했다. 원본 47개 파일은 수정 전에 `.tools/original-baseline.zip`으로 보존했다.
+3. 원본은 Git 커밋 `cfd5fbe`와 태그 `original-baseline`, 그리고 `.tools/original-baseline.zip`(47개 파일)으로 보존했다. 저장소 폴더 소유자가 다른 계정으로 잡혀 있어 Git 명령에 `safe.directory` 설정이 필요하다.
 
 원본 압축 SHA-256: `0ff25ff51097835a46b4b2a9c89d353b19ecebdb7a5c166ac5e8b44b1044fe71`.
 모니터링 데이터와 `supervisor_v1.py`는 원본 바이트를 유지했다. 런북 6개의 첫 단계는 캡처 검토 후 실제 도구 기능에 맞게 수정했다. 비교 실행 도구는 원본과 개선판 양쪽에 현재의 동일한 런북을 제공한다. 원본 압축은 로컬 보존용이며 Git에서 제외된다.
 
-## Before/After 기록 대기
+## Before/After
 
-| 항목 | Before | After |
-|---|---|---|
-| 대상 처리 | 미측정 | 미측정 |
-| 런북 선택 | 미측정 | 미측정 |
-| 사실 수치 일치 | 미측정 | 미측정 |
-| 응답 시간 | 미측정 | 미측정 |
-
-README의 비교 명령으로 정량 결과를 저장하는 작업은 남아 있다. 생성 모델은 동일하게 고정하고 예열한다. 원본의 일부러 넣은 지연·실패 장치는 결과 해석에 별도로 명시한다.
+같은 모델·고정 데이터로 14개 시나리오를 측정했다. 표와 해석은 [Before/After](../results/before_after.md)에 있다.
 
 ## 첫 시연 후 출력 보완
 
