@@ -4,7 +4,7 @@ fast는 분류·계획·단순 대화, quality는 응답 작성 전담이며 기
 Ollama의 구조화 출력(format=<JSON Schema>)과
 temperature=0으로 변동을 줄이지만 실모델이므로 결정론은 아니다 — 그래서 gate(W6)·
 replan(W7)·validator(W8)가 연출이 아니라 실제 방어선으로 동작한다.
-fc
+
 비용(cost_usd)은 '가상 단가 × 실측 토큰 수(prompt_eval_count+eval_count)'다 — 로컬
 추론이라 실제 과금은 0이지만, W10a의 모델 분리 효과를 같은 잣대로 비교하기 위함이다.
 

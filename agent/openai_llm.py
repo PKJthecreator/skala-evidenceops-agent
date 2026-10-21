@@ -1,7 +1,7 @@
 """LLM_BACKEND=openai — 실제 OpenAI API 백엔드 (fake_llm/ollama_llm과 동일 인터페이스).
 
 Wave 10a 구도를 실제 상용 API로: fast(기본 gpt-4o-mini)는 분류·계획·단순 대화,
-quality(기본 gpt-4o)는 최종 답변 작성 전담. ollama_llm.py와 마찬가지로 실모델이라
+quality(기본 gpt-4o-mini)는 최종 답변 작성 전담. ollama_llm.py와 마찬가지로 실모델이라
 결정론은 아니다 — gate(W6)·replan(W7)·validator(W8)가 연출이 아니라 실제 방어선으로
 동작한다. Ollama와 달리 실제 과금이 발생하는 원격 API이므로, 이 백엔드로 실행하면
 OpenAI 계정에 실제 비용이 청구된다(run_openai.sh 실행 전 반드시 인지할 것).
@@ -209,7 +209,7 @@ class OpenAIFastLLM(OpenAILLM):
 
 
 class OpenAIQualityLLM(OpenAILLM):
-    """최종 답변 작성 전담 (고품질 모델, 기본 gpt-4o)."""
+    """최종 답변 작성 전담 (기본 gpt-4o-mini, OPENAI_QUALITY_MODEL로 변경)."""
 
     @traceable(run_type="llm", name="openai_quality.write")
     async def write(self, query: str, collected: list[dict], attempt: int,

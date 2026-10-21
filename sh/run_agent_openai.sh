@@ -19,9 +19,6 @@ cd "$(dirname "$0")/.."
 # 경우가 있어, 이 프로젝트 전용 .venv가 있으면 PATH 맨 앞에 명시적으로 꽂아둔다.
 [ -x ".venv/bin/python3" ] && export PATH="$PWD/.venv/bin:$PATH"
 
-FAST_MODEL="${OPENAI_FAST_MODEL:-gpt-4o-mini}"
-QUALITY_MODEL="${OPENAI_QUALITY_MODEL:-gpt-4o}"
-
 # ── 0) 환경 변수 ───────────────────────────────────────────────────────
 if [ ! -f .env ]; then
     echo "ERROR: .env가 없습니다 — .env.example을 복사해 .env로 만들고 본인 API 키를 채워주세요."
@@ -30,6 +27,8 @@ if [ ! -f .env ]; then
 fi
 set -a; source .env; set +a
 export LANGCHAIN_PROJECT="capstone-all-total-openai"   # fake/ollama 모드와 프로젝트 분리
+FAST_MODEL="${OPENAI_FAST_MODEL:-gpt-4o-mini}"
+QUALITY_MODEL="${OPENAI_QUALITY_MODEL:-gpt-4o-mini}"
 
 if [ -z "${OPENAI_API_KEY:-}" ] || [ "$OPENAI_API_KEY" = "sk-..." ]; then
     echo "ERROR: OPENAI_API_KEY가 비어있거나 플레이스홀더입니다 — .env에 본인 키를 채우세요 (.env.example 참고)."

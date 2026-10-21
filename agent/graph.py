@@ -206,7 +206,10 @@ async def replan_check_node(state: AgentState, deps: SupervisorDeps) -> dict:
         try:
             documents = await asyncio.wait_for(deps.retriever.search(query), 65)
             for doc in documents:
-                collected.append({"source": "runbook", "data": doc["text"], "doc_id": doc["doc_id"],
+                # RAG는 incident_type만 고르고, 본문은 기존 MCP Resource로 읽는다 (Wave 2).
+                server, template = await asyncio.wait_for(deps.mcp.find_resource_template("get_incident_runbook"), 5)
+                text = await asyncio.wait_for(deps.mcp.read_resource(template.format(incident_type=doc["doc_id"]), server=server), 5)
+                collected.append({"source": "runbook", "data": text, "doc_id": doc["doc_id"],
                                   "target": target, "evidence_id": f"E{len(collected) + 1}"})
             events.append({"type": "RetrievalCompleted", "target": target, "doc_ids": [d["doc_id"] for d in documents]})
             if not documents:

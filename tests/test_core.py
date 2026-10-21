@@ -46,6 +46,7 @@ class CoreTests(unittest.TestCase):
         answer = render_answer([{"source": "monitoring", "data": data, "evidence_id": "E1"}])
         self.assertIn("CPU 93.0%", answer)
         self.assertIn("메모리 55.0%", answer)
+        self.assertIn("알림: CPU utilization high", answer)
         self.assertIn("오래된 관측", answer)
         for change in ({"cpu_percent": math.nan}, {"memory_percent": -1}, {"cpu_percent": True},
                        {"system_name": "auth-service"}, {"status": "unknown"}, {"alerts": [1]}):
@@ -171,6 +172,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         self.failed_targets = set()
         self.age = 0
         self.search_queries = []
+        self.resources = []
         self.writer_calls = 0
         owner = self
         class MCP:
@@ -178,6 +180,11 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
                 return "ops"
             async def get_prompt(self, *args, **kwargs):
                 return "상태를 조회하고 근거를 확인하세요."
+            async def find_resource_template(self, name):
+                return "ops", "runbook://incident-response/{incident_type}"
+            async def read_resource(self, uri, server="ops"):
+                owner.resources.append(uri)
+                return (ROOT / "data/runbooks" / (uri.rsplit("/", 1)[-1] + ".md")).read_text(encoding="utf-8")
             async def call_tool(self, name, arguments):
                 target = arguments["system_name"]
                 owner.calls.append(target)
@@ -187,8 +194,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         class Retriever:
             async def search(self, query):
                 owner.search_queries.append(query)
-                doc_id = "db-down" if "DB 다운" in query else "cpu-spike"
-                return [{"doc_id": doc_id, "text": (ROOT / f"data/runbooks/{doc_id}.md").read_text(encoding="utf-8")}]
+                return [{"doc_id": "db-down" if "DB 다운" in query else "cpu-spike"}]
         class WrongWriter:
             async def write(self, query, collected, attempt, feedback, on_token=None):
                 owner.writer_calls += 1
@@ -253,6 +259,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("확인된 관측 사실이 없습니다", result["final"])
         self.assertNotIn("원인 후보", result["final"])
         self.assertIn("서비스 정상화", result["final"])
+        self.assertEqual(self.resources, ["runbook://incident-response/db-down"])
         await self.invoke("응답이 느려요")
         await self.invoke("취소")
         self.assertIsNone(self.store.get_pending("test"))

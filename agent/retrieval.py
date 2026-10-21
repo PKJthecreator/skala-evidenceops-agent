@@ -4,6 +4,8 @@ import math
 import os
 from pathlib import Path
 
+from langsmith import traceable
+
 
 def normalized(vector: list[float]) -> list[float]:
     if not vector or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in vector):
@@ -28,6 +30,7 @@ class RunbookSearch:
         self.model = os.getenv("EMBED_MODEL", "bge-m3")
         self.min_score = float(os.getenv("RUNBOOK_MIN_SCORE", "0.55"))
 
+    @traceable(run_type="retriever", name="runbook_search")
     async def search(self, query: str) -> list[dict]:
         import httpx
 

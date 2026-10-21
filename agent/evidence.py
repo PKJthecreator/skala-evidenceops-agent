@@ -68,7 +68,8 @@ def render_answer(collected: list[dict], notes: str = "", intent: str = "diagnos
         if item["source"] == "monitoring":
             data = item["data"]
             stale = " (오래된 관측, 최신 상태로 해석할 수 없음)" if data["stale"] else ""
-            facts.append(f"[{evidence_id}] {data['system_name']}: 상태={data['status']}, CPU {data['cpu_percent']}%, 메모리 {data['memory_percent']}%, 관측 {data['last_checked']}{stale}")
+            alerts = ", 알림: " + "; ".join(data["alerts"]) if data["alerts"] else ""
+            facts.append(f"[{evidence_id}] {data['system_name']}: 상태={data['status']}, CPU {data['cpu_percent']}%, 메모리 {data['memory_percent']}%, 관측 {data['last_checked']}{alerts}{stale}")
             if data["stale"]:
                 limits.append(data["system_name"] + ": 최신 모니터링을 다시 확인해 주세요.")
         elif item["source"] == "runbook":
