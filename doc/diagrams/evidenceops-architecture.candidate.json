@@ -1,0 +1,453 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "EvidenceOps 전체 구조",
+    "locale": "ko",
+    "output": ".archify/architecture-evidenceops-20261022-085500/evidenceops-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/PKJthecreator/skala-evidenceops-agent.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "7ccb7e6adc4645b83209e73b6802d976f5909f60"
+    },
+    "legend": {
+      "entries": {
+        "security": {
+          "label": "검증·판단 가드"
+        }
+      }
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "사용자",
+      "sublabel": "브라우저",
+      "icon": "person",
+      "pos": [
+        40,
+        230
+      ],
+      "size": [
+        100,
+        64
+      ],
+      "sources": [
+        {
+          "path": "web_chat.html",
+          "line": 103,
+          "end_line": 110,
+          "label": "질문 입력 폼"
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Vue 채팅 UI",
+      "sublabel": "web_chat.html · :8600 프록시",
+      "pos": [
+        190,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "web_chat.html",
+          "line": 163,
+          "label": "EventSource로 SSE 수신"
+        },
+        {
+          "path": "web_demo_server.py",
+          "line": 49,
+          "end_line": 60,
+          "label": "8100으로 SSE 중계"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI 서버",
+      "sublabel": "server.py · 초안 토큰 차단",
+      "pos": [
+        440,
+        230
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "server.py",
+          "line": 64,
+          "end_line": 81,
+          "label": "lifespan에서 1회 조립"
+        },
+        {
+          "path": "server.py",
+          "line": 155,
+          "end_line": 195,
+          "label": "SSE, 초안 토큰 차단"
+        }
+      ]
+    },
+    {
+      "id": "graph",
+      "type": "backend",
+      "label": "LangGraph Supervisor v2 (개선)",
+      "sublabel": "route→plan→research→RAG→write→validate",
+      "pos": [
+        670,
+        226
+      ],
+      "size": [
+        330,
+        72
+      ],
+      "sources": [
+        {
+          "path": "agent/graph.py",
+          "line": 304,
+          "end_line": 332,
+          "label": "노드·분기 구성"
+        },
+        {
+          "path": "agent/graph.py",
+          "line": 59,
+          "end_line": 85,
+          "label": "route: 의도·대상 확정"
+        },
+        {
+          "path": "agent/graph.py",
+          "line": 154,
+          "end_line": 166,
+          "label": "대상별 조회 격리"
+        }
+      ]
+    },
+    {
+      "id": "intent",
+      "type": "security",
+      "label": "대상 확인 (신규)",
+      "sublabel": "intent.py · 별칭·되묻기",
+      "pos": [
+        680,
+        50
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/intent.py",
+          "line": 36,
+          "end_line": 59,
+          "label": "대상·미등록·의도 판단"
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "type": "security",
+      "label": "근거 검증 (신규)",
+      "sublabel": "evidence.py · 수치 필터",
+      "pos": [
+        850,
+        50
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/evidence.py",
+          "line": 20,
+          "end_line": 36,
+          "label": "조회값 검증·5분 stale"
+        },
+        {
+          "path": "agent/evidence.py",
+          "line": 39,
+          "end_line": 61,
+          "label": "생성 문장 필터"
+        },
+        {
+          "path": "agent/evidence.py",
+          "line": 64,
+          "end_line": 96,
+          "label": "사실을 코드로 렌더링"
+        }
+      ]
+    },
+    {
+      "id": "session",
+      "type": "database",
+      "label": "SQLite session.db",
+      "sublabel": "대화 이력 · pending(신규)",
+      "pos": [
+        430,
+        50
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/session_store.py",
+          "line": 13,
+          "end_line": 49,
+          "label": "messages·pending 테이블"
+        },
+        {
+          "path": "server.py",
+          "line": 134,
+          "end_line": 142,
+          "label": "이력 load·append"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP 서버 (ops)",
+      "sublabel": "Tool · Resource · Prompt",
+      "pos": [
+        1090,
+        230
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "mcp_server.py",
+          "line": 33,
+          "end_line": 78,
+          "label": "Tool·Resource·Prompt"
+        },
+        {
+          "path": "agent/mcp_client.py",
+          "line": 53,
+          "end_line": 62,
+          "label": "stdio 하위 프로세스 기동"
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "모니터링·런북",
+      "sublabel": "monitoring.json · 런북 6개",
+      "pos": [
+        1075,
+        420
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "data/monitoring.json",
+          "line": 1,
+          "end_line": 38,
+          "label": "서비스 6개 샘플"
+        },
+        {
+          "path": "mcp_server.py",
+          "line": 56,
+          "end_line": 62,
+          "label": "런북 파일 읽기"
+        }
+      ]
+    },
+    {
+      "id": "retrieval",
+      "type": "backend",
+      "label": "런북 RAG (신규)",
+      "sublabel": "retrieval.py · 코사인",
+      "pos": [
+        760,
+        420
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/retrieval.py",
+          "line": 19,
+          "end_line": 59,
+          "label": "임베딩 색인·검색"
+        },
+        {
+          "path": "agent/graph.py",
+          "line": 187,
+          "end_line": 220,
+          "label": "대상별 검색→Resource 본문"
+        }
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "external",
+      "label": "Ollama (로컬)",
+      "sublabel": "qwen3.5:2b · bge-m3",
+      "pos": [
+        760,
+        590
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "agent/ollama_llm.py",
+          "line": 23,
+          "label": "/api/chat"
+        },
+        {
+          "path": "agent/retrieval.py",
+          "line": 29,
+          "end_line": 30,
+          "label": "/api/embed, bge-m3"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "MCP 하위 프로세스 (stdio)",
+      "wraps": [
+        "mcp"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ask",
+      "from": "user",
+      "to": "ui",
+      "label": "질문",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-api",
+      "from": "ui",
+      "to": "api",
+      "label": "HTTP · SSE",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-graph",
+      "from": "api",
+      "to": "graph",
+      "label": "astream",
+      "variant": "emphasis"
+    },
+    {
+      "id": "graph-mcp",
+      "from": "graph",
+      "to": "mcp",
+      "label": "MCP stdio",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-session",
+      "from": "api",
+      "to": "session",
+      "label": "대화 이력"
+    },
+    {
+      "id": "graph-intent",
+      "from": "graph",
+      "to": "intent",
+      "label": "대상 판단"
+    },
+    {
+      "id": "graph-evidence",
+      "from": "graph",
+      "to": "evidence",
+      "label": "사실 검증"
+    },
+    {
+      "id": "graph-retrieval",
+      "from": "graph",
+      "to": "retrieval",
+      "label": "증상·알림 검색"
+    },
+    {
+      "id": "retrieval-data",
+      "from": "retrieval",
+      "to": "data",
+      "label": "색인용 읽기",
+      "variant": "dashed"
+    },
+    {
+      "id": "mcp-data",
+      "from": "mcp",
+      "to": "data",
+      "label": "파일 읽기"
+    },
+    {
+      "id": "retrieval-ollama",
+      "from": "retrieval",
+      "to": "ollama",
+      "label": "임베딩"
+    },
+    {
+      "id": "graph-ollama",
+      "from": "graph",
+      "to": "ollama",
+      "label": "LLM 호출",
+      "fromSide": "bottom",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "이번에 새로 만든 것",
+      "items": [
+        "intent.py — 서비스명·별칭으로 대상을 정하고, 미등록이면 안내, 단서가 없으면 되묻기",
+        "retrieval.py — bge-m3 임베딩 코사인 검색, 0.55 미만이면 런북 없음으로 처리",
+        "evidence.py — 조회값 검증, LLM 문장의 숫자·단정 제거, 사실은 [E#]로 코드가 출력",
+        "session.db pending 테이블 — 되묻기 후 같은 대화에서 진단을 이어감"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "원본에서 그대로 쓴 것",
+      "items": [
+        "FastAPI lifespan에서 MCP 연결·그래프를 한 번만 생성",
+        "MCP Tool·Resource·Prompt와 서버 탐색(ops·docs)",
+        "SupervisorDeps + partial 의존성 주입, v1/v2 전환",
+        "LangSmith @traceable (키가 있을 때만 기록)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "평가와 선택 기능",
+      "items": [
+        "eval/run_eval.py — 고정 snapshot으로 원본·개선판 14개 시나리오 비교",
+        "LLM_BACKEND=openai로 OpenAI API 사용 가능",
+        "SSE는 진행 이벤트와 검증된 최종 답변만 보냄"
+      ]
+    }
+  ]
+}
