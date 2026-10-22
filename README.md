@@ -6,7 +6,6 @@
 
 [![EvidenceOps 전체 구조](doc/diagrams/evidenceops-architecture.png)](doc/diagrams/evidenceops-architecture.html)
 
-위 그림은 이번에 고친 에이전트의 전체 구조입니다. 빨간 상자(대상 확인, 근거 검증)와 `(신규)` 표시가 붙은 부분이 이번에 새로 만든 모듈이고, 나머지는 원본 구조를 그대로 쓰거나 일부만 고쳤습니다. [Archify](https://github.com/tt-a1i/archify)로 만들었고, [인터랙티브 버전(HTML)](doc/diagrams/evidenceops-architecture.html)을 내려받아 브라우저로 열면 노드를 눌러 해당 소스 코드 위치(SRC 링크)까지 따라가 볼 수 있습니다. GitHub 화면에서는 HTML이 소스로만 보입니다.
 
 출발점은 강의에서 받은 운영 인시던트 대응 에이전트 `all_total_vue`입니다. 원본을 직접 돌려 보니 대상 서비스를 근거 없이 골라 버리거나, 모델이 지어낸 수치가 그대로 최종 답변이 되는 경우가 있었습니다. 그래서 목표를 하나로 정했습니다. **사실은 조회한 값으로만 말하고, 모르는 건 모른다고 말하게 하는 것**입니다.
 
